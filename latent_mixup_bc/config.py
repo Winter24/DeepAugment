@@ -10,7 +10,10 @@ from typing import Optional, Tuple
 
 ENVIRONMENTS = ("hopper", "halfcheetah", "walker2d")
 QUALITIES = ("medium", "medium-replay", "medium-expert")
-METHODS = ("vanilla_bc", "noise_bc", "input_mixup_bc", "latent_mixup_bc")
+METHODS = (
+    "vanilla_bc", "noise_bc", "input_mixup_bc", "latent_mixup_bc",
+    "local_latent_mixup_bc",
+)
 SEEDS = (0, 1, 2, 3, 4)
 MODES = ("SMOKE", "SINGLE_RUN", "FULL_BENCHMARK")
 
@@ -27,6 +30,7 @@ class ExperimentConfig:
     learning_rate: float = 3e-4
     latent_dim: int = 128
     mixup_alpha: float = 0.2
+    action_threshold: float = 1.0
     training_noise_std: float = 0.05
     max_epochs: int = 100
     patience: int = 10

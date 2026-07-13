@@ -1,12 +1,12 @@
 from latent_mixup_bc.config import ExperimentConfig, config_hash, enumerate_runs
 
 
-def test_full_benchmark_has_180_unique_runs():
+def test_full_benchmark_has_225_unique_runs_with_local_knn_method():
     cfg = ExperimentConfig(mode="FULL_BENCHMARK")
     runs = enumerate_runs(cfg)
     keys = {(r.dataset_id, r.method, r.seed) for r in runs}
-    assert len(runs) == 180
-    assert len(keys) == 180
+    assert len(runs) == 225
+    assert len(keys) == 225
 
 
 def test_hash_is_stable_and_changes_with_training_semantics():
@@ -19,8 +19,9 @@ def test_hash_is_stable_and_changes_with_training_semantics():
 
 def test_smoke_enumerates_all_methods_for_one_dataset_and_seed():
     runs = enumerate_runs(ExperimentConfig(mode="SMOKE"))
-    assert len(runs) == 4
+    assert len(runs) == 5
     assert {r.method for r in runs} == {
-        "vanilla_bc", "noise_bc", "input_mixup_bc", "latent_mixup_bc"
+        "vanilla_bc", "noise_bc", "input_mixup_bc", "latent_mixup_bc",
+        "local_latent_mixup_bc",
     }
     assert {r.env_id for r in runs} == {"Hopper-v5"}

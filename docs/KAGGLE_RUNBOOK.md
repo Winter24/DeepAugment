@@ -4,20 +4,20 @@
 
 1. Create a Kaggle Notebook with Internet enabled. A GPU is recommended for training; MuJoCo rollouts may remain CPU-bound.
 2. Upload `Latent State-Action Mixup.ipynb`.
-3. Keep `RUN_MODE = "SMOKE"` and run all cells. This uses one real D4RL dataset, all four methods, two epochs, and two episodes per noise level.
+3. Keep `RUN_MODE = "SMOKE"` and run all cells. This uses one real D4RL dataset, all five methods, two epochs, and two episodes per noise level.
 4. Do not switch to `FULL_BENCHMARK` until dependency diagnostics, real-data validation, checkpoint restoration, simulator validation, and plots all succeed.
 
 If Cell 1 reports `numpy.dtype size changed`, the container was polluted by an earlier NumPy downgrade. Use Kaggle **Factory reset session**, upload/open the current notebook, and run from Cell 1. The notebook intentionally does not force-reinstall NumPy or pandas in a clean Kaggle image.
 
 The install cell uses Python 3.12-compatible Gymnasium and native MuJoCo. Training data is downloaded directly from the original D4RL v2 HDF5 URLs. Evaluation uses Gymnasium MuJoCo v5 and is labeled `modern_simulator_compatibility_score`; it is not the original D4RL v2 benchmark.
 
-Prefer a **Tesla T4** accelerator. Current Kaggle PyTorch wheels may not contain kernels for the Tesla P100 (`sm_60`). The trainer checks the actual CUDA architecture and safely falls back to CPU instead of crashing; CPU is acceptable for `SMOKE` but impractical for the full 180-run benchmark.
+Prefer a **Tesla T4** accelerator. Current Kaggle PyTorch wheels may not contain kernels for the Tesla P100 (`sm_60`). The trainer checks the actual CUDA architecture and safely falls back to CPU instead of crashing; CPU is acceptable for `SMOKE` but impractical for the full 225-run benchmark.
 
 ## Run modes
 
 - `SMOKE`: safe end-to-end acceptance run.
 - `SINGLE_RUN`: set dataset, method, and seed to diagnose or fill one missing job.
-- `FULL_BENCHMARK`: enumerates 180 training jobs and resumes completed work.
+- `FULL_BENCHMARK`: enumerates 225 training jobs and resumes completed work.
 
 Artifacts default to `/kaggle/working/latent_mixup_bc`. Use `RESUME_INPUT_ROOT = None` in the first session.
 

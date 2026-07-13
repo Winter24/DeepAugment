@@ -26,11 +26,11 @@ def test_notebook_has_management_markdown_and_no_legacy_topics():
         assert forbidden not in text
 
 
-def test_notebook_embeds_all_four_methods_and_180_run_assertion():
+def test_notebook_embeds_all_five_methods_and_225_run_assertion():
     text = notebook_text()
-    for method in ["vanilla_bc", "noise_bc", "input_mixup_bc", "latent_mixup_bc"]:
+    for method in ["vanilla_bc", "noise_bc", "input_mixup_bc", "latent_mixup_bc", "local_latent_mixup_bc"]:
         assert method in text
-    assert "assert len(runs) == 180" in text
+    assert "assert len(runs) == 225" in text
 
 
 def test_notebook_uses_python312_compatible_backend_and_honest_metric_label():

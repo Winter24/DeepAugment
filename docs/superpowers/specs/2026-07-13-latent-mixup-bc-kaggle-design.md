@@ -24,12 +24,13 @@ The loader must never silently replace missing D4RL data with synthetic data. A 
 
 ### Methods
 
-Train four methods:
+Train five methods:
 
 1. `vanilla_bc`: unmodified state input and action target.
 2. `noise_bc`: Gaussian noise added to normalized states during training.
 3. `input_mixup_bc`: state vectors and action targets mixed with the same coefficient and permutation.
 4. `latent_mixup_bc`: encoded state representations and action targets mixed with the same coefficient and permutation before the policy head.
+5. `local_latent_mixup_bc`: encoded states mix only with the nearest in-batch latent neighbor satisfying an action-distance threshold; samples without a valid neighbor remain unchanged.
 
 All methods must use the same encoder/head capacity. Vanilla, noise, and input-mixup methods still pass through the same encoder and policy head; only the augmentation location differs. This controls for parameter count and depth.
 
@@ -103,7 +104,7 @@ Three run modes are required:
 
 - `SMOKE`: one dataset, one seed, small subset, two epochs, two evaluation episodes.
 - `SINGLE_RUN`: one explicitly selected dataset/method/seed.
-- `FULL_BENCHMARK`: all nine datasets, four methods, and five seeds.
+- `FULL_BENCHMARK`: all nine datasets, five methods, and five seeds.
 
 The full benchmark is expected to span multiple Kaggle sessions. Each run is identified by `(dataset_id, method, seed, config_hash)`. A run is skipped only when its checkpoint, training history, completion manifest, and required evaluation rows all exist and pass integrity checks.
 
@@ -190,7 +191,7 @@ The implementation is accepted when:
 - no mixup representation/target pairing mismatch is possible through the public augmentation interface;
 - `SMOKE` completes top to bottom on Kaggle with real D4RL data and simulator interaction;
 - interrupted training/evaluation can resume without duplicating completed runs or episodes;
-- `FULL_BENCHMARK` enumerates exactly 180 training runs;
+- `FULL_BENCHMARK` enumerates exactly 225 training runs;
 - checkpoints, histories, manifests, episode results, summaries, and figures follow the persistence layout;
 - every reported aggregate includes its sample count and uncertainty;
 - the notebook clearly distinguishes measured results from hypotheses and does not contain fabricated benchmark values;

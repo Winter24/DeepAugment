@@ -1,6 +1,6 @@
 # Run Tracker
 
-**Protocol:** the expected matrix contains 180 `(dataset, method, seed)` rows.
+**Protocol:** the expected matrix contains 225 `(dataset, method, seed)` rows after adding local k-NN latent mixup.
 
 This file is a human-readable snapshot generated from manifests and episode CSV. The artifact files—not manual checkboxes—are the source of truth.
 

@@ -32,7 +32,7 @@ def writefile_cell(section, relative_path):
     return nbf.v4.new_code_cell(f"%%writefile {relative_path}\n# SECTION: {section}\n{source.rstrip()}\n")
 
 
-def build():
+def build(output=OUTPUT, include_local_knn=False):
     nb = nbf.v4.new_notebook()
     nb.metadata.update({
         "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
@@ -41,10 +41,10 @@ def build():
     })
     cells = [nbf.v4.new_markdown_cell(
         "# Experiment Dashboard: Latent-Space State–Action Mixup BC\n\n"
-        "**Protocol:** Compare four controlled Behavior Cloning augmentations on nine D4RL locomotion datasets. "
+        "**Protocol:** Compare five controlled Behavior Cloning augmentations on nine D4RL locomotion datasets. "
         "Evaluation uses a modern Gymnasium v5 simulator and is explicitly labeled a compatibility score, not the original D4RL v2 benchmark.\n\n"
         "| Item | Default |\n|---|---|\n| Run mode | `SMOKE` |\n| Methods | Vanilla, training noise, input mixup, latent mixup |\n"
-        "| Full matrix | 9 datasets × 4 methods × 5 seeds = 180 runs |\n| OOD noise | 0, .01, .05, .10, .20 normalized units |\n"
+        "| Full matrix | 9 datasets × 5 methods × 5 seeds = 225 runs |\n| OOD noise | 0, .01, .05, .10, .20 normalized units |\n"
         "| Artifact root | `/kaggle/working/latent_mixup_bc` |\n\n"
         "Run top-to-bottom. First complete `SMOKE`; publish the artifact directory as a Kaggle Dataset, attach it in the next session, set `RESUME_INPUT_ROOT`, then use `FULL_BENCHMARK`."
     )]
@@ -93,7 +93,7 @@ config = ExperimentConfig(
 )
 runs = enumerate_runs(config)
 if RUN_MODE == "FULL_BENCHMARK":
-    assert len(runs) == 180
+    assert len(runs) == 225
 print({"mode": RUN_MODE, "jobs": len(runs), "config_hash": config_hash(config), "output": str(OUTPUT_ROOT)})'''),
         management("Reproducibility and Self-Tests", "Materialize tested core modules and catch semantic regressions before costly work.", "Canonical embedded module source.", "Importable package and passing assertions.", "All", "seconds", "Fix the failing assertion; do not proceed to data or training."),
         writefile_cell("data module", "latent_mixup_bc/data.py"),
@@ -109,7 +109,7 @@ mixed = prepare_training_batch("input_mixup_bc", s, a, lam=lam, permutation=perm
 assert torch.equal(mixed.permutation, perm)
 assert torch.allclose(mixed.target, lam[:, None] * a + (1-lam[:, None]) * a[perm])
 assert BCPolicy(11, 3)(torch.zeros(2, 11)).shape == (2, 3)
-assert set(config.methods) == {"vanilla_bc", "noise_bc", "input_mixup_bc", "latent_mixup_bc"}
+assert set(config.methods) == {"vanilla_bc", "noise_bc", "input_mixup_bc", "latent_mixup_bc", "local_latent_mixup_bc"}
 print("Core self-tests passed")'''),
         management("D4RL Data", "Download original fixed D4RL v2 HDF5 data directly, reconstruct trajectories, and compute train-only statistics.", "Kaggle Internet or cached HDF5.", "Validated arrays, disjoint DataLoaders, StateNormalizer.", "All", "minutes", "On download/data failure, attach the cached HDF5 files or repair Internet access; no generated fallback data."),
         code("D4RL Data", r'''from urllib.request import urlretrieve
@@ -423,6 +423,115 @@ assert not temporary_files, temporary_files
 print("Artifact root:", OUTPUT_ROOT)
 print("Publish this directory as a Kaggle Dataset, attach it next session, then set RESUME_INPUT_ROOT.")'''),
     ]
+    if include_local_knn:
+        cells[0].source = cells[0].source.replace(
+            "Latent-Space State–Action Mixup BC",
+            "In-batch k-NN Latent State–Action Mixup BC",
+        )
+        for cell in cells:
+            if cell.cell_type == "code" and 'RUN_MODE = "SMOKE"' in cell.source:
+                cell.source = cell.source.replace('RUN_MODE = "SMOKE"', 'RUN_MODE = "SINGLE_RUN"')
+                break
+        cells[0].source += (
+            "\n\n> **Extension workflow:** attach/preserve the artifact directory from the completed "
+            "four-method experiment. This notebook skips old training/evaluation and trains only "
+            "`local_latent_mixup_bc` for seeds 0–4."
+        )
+        for cell in cells:
+            if cell.cell_type != "code":
+                continue
+            if cell.source.startswith("# SECTION: Training and Resume"):
+                cell.source = r'''# SECTION: Training and Resume
+from latent_mixup_bc.persistence import ArtifactStore, restore_missing_artifacts
+
+if RESUME_INPUT_ROOT:
+    source = Path(RESUME_INPUT_ROOT)
+    if not source.exists():
+        raise FileNotFoundError(f"RESUME_INPUT_ROOT does not exist: {source}")
+    copied = restore_missing_artifacts(source, OUTPUT_ROOT)
+    print(f"Restored {len(copied)} missing artifacts without overwriting working files")
+store = ArtifactStore(OUTPUT_ROOT)
+print("Extension notebook: baseline training skipped; existing artifacts will be reused.")
+'''
+            elif cell.source.startswith("# SECTION: Evaluation"):
+                cell.source = '''# SECTION: Evaluation\nprint("Extension notebook: baseline evaluation skipped; existing episode CSV will be reused.")\n'''
+            elif any(cell.source.startswith(f"# SECTION: Pilot Method: {name}") for name in ("Noise BC", "Input Mixup BC", "Latent Mixup BC")):
+                cell.source = '''# SECTION: Old Method Pilot\nprint("Old method pilot skipped; restored artifacts are reused.")\n'''
+            elif any(cell.source.startswith(f"# SECTION: Pilot Seed {seed}") for seed in range(1, 5)):
+                cell.source = '''# SECTION: Old Multi-Seed Pilot\nprint("Old multi-seed training skipped; restored artifacts are reused.")\n'''
+        local_cells = [
+            management("In-batch k-NN Latent State–Action Mixup", "Add the local action-compatible nearest-neighbor method while preserving the four completed baselines.", "Existing four-method artifacts, embedded updated model/training modules, and selected dataset.", "Local k-NN method configuration and incremental seed cells.", "SINGLE_RUN only", "seconds", "Attach/preserve prior artifacts; only the new method is trained in the following seed cells."),
+            code("In-batch k-NN Latent State–Action Mixup", r'''LOCAL_KNN_METHOD = "local_latent_mixup_bc"
+if LOCAL_KNN_METHOD not in MULTI_SEED_METHODS:
+    MULTI_SEED_METHODS.append(LOCAL_KNN_METHOD)
+print({
+    "method": LOCAL_KNN_METHOD,
+    "mixup_alpha": config.mixup_alpha,
+    "action_threshold": config.action_threshold,
+    "seeds": SEEDS,
+})'''),
+        ]
+        for seed in range(5):
+            local_cells.extend([
+                management(
+                    f"Local k-NN Seed {seed}",
+                    f"Train and evaluate only local_latent_mixup_bc for seed {seed}.",
+                    "Updated helper, dataset cache, and prior baseline artifacts.",
+                    f"Local k-NN checkpoint/history/manifest and evaluation rows for seed {seed}.",
+                    "SINGLE_RUN only",
+                    "expensive",
+                    "Safe to rerun; matching checkpoint and episode keys are skipped.",
+                ),
+                code(
+                    f"Local k-NN Seed {seed}",
+                    f'local_knn_seed_{seed}_result = run_method_seed("local_latent_mixup_bc", {seed})',
+                ),
+            ])
+        local_cells.extend([
+            management("Five-Method Aggregate Comparison", "Compare local k-NN mixup with Vanilla, Noise, Input Mixup, and random Latent Mixup across all completed seeds.", "Episode and history artifacts for five methods and seeds 0–4.", "Coverage, mean/std/CI table, and inline aggregate figures.", "SINGLE_RUN only", "seconds", "Missing local seeds stay missing; rerun their dedicated cell rather than imputing scores."),
+            code("Five-Method Aggregate Comparison", r'''FIVE_METHODS = [
+    "vanilla_bc", "noise_bc", "input_mixup_bc",
+    "latent_mixup_bc", "local_latent_mixup_bc",
+]
+all_results = pd.read_csv(store.episode_results_path)
+five_method_episodes = all_results.loc[
+    all_results.dataset_id.eq(SINGLE_DATASET)
+    & all_results.seed.isin(SEEDS)
+    & all_results.method.isin(FIVE_METHODS)
+].copy()
+
+clean_rows = five_method_episodes.loc[five_method_episodes.noise_std.eq(0.0)]
+five_method_coverage = clean_rows.groupby("method")["seed"].nunique().reindex(FIVE_METHODS, fill_value=0)
+display(Markdown("### Five-method seed coverage"))
+display(five_method_coverage.rename("completed_seed_count").to_frame())
+
+five_method_summary = summarize_results(five_method_episodes)
+display(Markdown("### Five-method summary"))
+display(five_method_summary)
+
+five_method_histories = []
+for seed in SEEDS:
+    for method in FIVE_METHODS:
+        path = store.history_path(SINGLE_DATASET, method, seed)
+        if path.exists():
+            frame = pd.read_csv(path)
+            frame["method"] = method
+            frame["seed"] = seed
+            five_method_histories.append(frame)
+five_method_histories = pd.concat(five_method_histories, ignore_index=True) if five_method_histories else pd.DataFrame()
+
+comparison_dir = OUTPUT_ROOT / "figures" / "five_method_comparison"
+comparison_paths = render_all_figures(
+    five_method_episodes, five_method_histories, comparison_dir
+)
+for title, filename in INLINE_FIGURES:
+    path = comparison_dir / filename
+    if path.exists():
+        display(Markdown(f"### Five Methods — {title}"))
+        display(Image(filename=str(path)))'''),
+        ])
+        cells[-2:-2] = local_cells
+
     managed_cells = []
     for cell in cells:
         if cell.cell_type == "code" and managed_cells and managed_cells[-1].cell_type != "markdown":
@@ -441,7 +550,7 @@ print("Publish this directory as a Kaggle Dataset, attach it next session, then 
         identity = f"{index}\0{cell.cell_type}\0{cell.source}".encode("utf-8")
         cell["id"] = sha256(identity).hexdigest()[:16]
     nb["cells"] = managed_cells
-    OUTPUT.write_text(nbf.writes(nb), encoding="utf-8")
+    Path(output).write_text(nbf.writes(nb), encoding="utf-8")
 
 
 if __name__ == "__main__":

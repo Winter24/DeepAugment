@@ -58,10 +58,12 @@ def set_global_seed(seed: int):
 
 
 def _training_prediction(model, method, states, actions, config):
-    if method == "latent_mixup_bc":
+    if method in ("latent_mixup_bc", "local_latent_mixup_bc"):
         latent = model.encode(states)
         batch = prepare_training_batch(
-            method, latent, actions, alpha=config.mixup_alpha, representation_is_latent=True
+            method, latent, actions, alpha=config.mixup_alpha,
+            action_threshold=config.action_threshold,
+            representation_is_latent=True,
         )
         return model.act_from_latent(batch.representation), batch.target
     batch = prepare_training_batch(

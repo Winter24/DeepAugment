@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from latent_mixup_bc.models import BCPolicy, prepare_training_batch
+from latent_mixup_bc.models import BCPolicy, local_latent_action_mixup, prepare_training_batch
 
 
 def test_input_mixup_reuses_lambda_and_permutation_for_actions():
@@ -47,3 +47,26 @@ def test_latent_mixup_uses_caller_supplied_pairing():
 def test_unknown_method_fails_loudly():
     with pytest.raises(ValueError, match="unknown method"):
         prepare_training_batch("mystery", torch.zeros(2, 1), torch.zeros(2, 1))
+
+
+def test_local_mixup_selects_nearest_action_compatible_neighbor():
+    latent = torch.tensor([[0.0], [0.1], [0.2]])
+    actions = torch.tensor([[0.0], [2.0], [0.2]])
+    result = local_latent_action_mixup(
+        latent, actions, alpha=0.2, action_threshold=0.5,
+        lam=torch.tensor([0.5, 0.5, 0.5]),
+    )
+    assert torch.equal(result.neighbor_index, torch.tensor([2, 1, 0]))
+    assert torch.equal(result.valid_neighbor_mask, torch.tensor([True, False, True]))
+    assert torch.allclose(result.latent[0], torch.tensor([0.1]))
+    assert torch.allclose(result.action[0], torch.tensor([0.1]))
+    assert torch.equal(result.latent[1], latent[1])
+    assert torch.equal(result.action[1], actions[1])
+
+
+def test_local_mixup_batch_size_one_is_identity():
+    latent, actions = torch.randn(1, 4), torch.randn(1, 2)
+    result = local_latent_action_mixup(latent, actions)
+    assert torch.equal(result.latent, latent)
+    assert torch.equal(result.action, actions)
+    assert not result.valid_neighbor_mask.item()
